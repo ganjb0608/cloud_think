@@ -1,0 +1,14 @@
+[
+  {"title": "vLLM 连续批处理实测", "url": "https://example.org/vllm-bench",
+   "text": "vLLM 的 continuous batching 在 A100 上相比 HuggingFace TGI 把吞吐提升到 2.4x，PagedAttention 显著降低了 KV cache 碎片。生态方面 vLLM 支持 OpenAI 兼容端点。"},
+  {"title": "SGLang RadixAttention", "url": "https://example.org/sglang",
+   "text": "SGLang 用 RadixAttention 复用前缀 KV cache，在多轮对话场景吞吐提升到 3.1x，但对长上下文单轮任务提升有限。"},
+  {"title": "llama.cpp 量化方案对比", "url": "https://example.org/quant",
+   "text": "GGUF 的 Q4_K_M 量化把 7B 模型显存占用压到 4.4GB，困惑度损失约 0.3。AWQ 在 4bit 下精度更好但需要校准集。GPTQ 部署最成熟。"},
+  {"title": "本地部署成本测算", "url": "https://example.org/cost",
+   "text": "单张 4090 跑 7B 模型的月度电费约 90 元，相比云 API 在日均 50 万 token 以上时开始划算。运维人力成本常被低估。"},
+  {"title": "推理框架生态盘点", "url": "https://example.org/ecosystem",
+   "text": "2026 年本地推理主要有 vLLM、SGLang、llama.cpp、TensorRT-LLM 四条路线。llama.cpp 覆盖 CPU 与 Apple Silicon，TensorRT-LLM 绑定 NVIDIA 但延迟最低。"},
+  {"title": "KV cache 与显存", "url": "https://example.org/kvcache",
+   "text": "长上下文场景下 KV cache 会超过权重本身占用。分页管理和量化 KV 是两条主要缓解路径。"}
+]

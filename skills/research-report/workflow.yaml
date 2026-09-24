@@ -1,0 +1,70 @@
+# 这个文件由 skills/compiler.py 编译成 core.Graph。
+# 它是「模式 A 摸索出流程 -> 模式 B 固化」的产物：流程稳定后换确定性和可恢复。
+task_channel: topic
+
+state:
+  topic:      {type: str,   description: 调研主题}
+  subqueries: {type: list,  reducer: replace, description: 正交子问题}
+  findings:   {type: dict,  reducer: merge,   description: 按子问题归并的调研结论}
+  conflicts:  {type: list,  reducer: replace, description: 脚本标出的矛盾结论}
+  draft_ref:  {type: str,   description: 草稿 artifact 引用（不存全文）}
+  review:     {type: dict,  description: 审稿结果 score/issues}
+  revision:   {type: int,   reducer: add,     description: 修订次数}
+  report_ref: {type: str,   description: 终稿 artifact 引用}
+
+agents:
+  planner:
+    prompt: prompts/planner.md
+    state_slice: [topic]
+    output: {subqueries: json}
+    max_tokens_out: 600
+
+  researcher:
+    prompt: prompts/researcher.md
+    tools: [web_search]
+    parallel_over: subqueries      # 声明式 fan-out：每个子问题一个独立实例
+    state_slice: [topic]           # 只给主题，不给别人的 findings
+    key_by: arg                    # 用自己那份子问题做归并 key
+    output: {findings: json}
+    max_tokens_out: 1200
+    max_tool_rounds: 4
+    retry: {max_attempts: 3, base: 0.2}
+
+  writer:
+    prompt: prompts/writer.md
+    context: [references/style-guide.md]    # L3：只有 writer 加载这份
+    state_slice: [topic, findings, conflicts, review]
+    output: {draft_ref: artifact}
+    artifact_name: "draft_v{revision}.md"
+    const: {revision: 1}
+
+  reviewer:
+    prompt: prompts/reviewer.md
+    context: [references/citation-rules.md] # L3：只有 reviewer 加载这份
+    tools: [read_file]
+    state_slice: [topic, draft_ref, findings]
+    output: {review: json}
+    max_tokens_out: 800
+
+scripts:
+  dedupe:
+    run: scripts/dedupe_sources.py
+    reads: [findings]
+    writes: [findings, conflicts]
+
+  publish:
+    run: scripts/render_report.py
+    reads: [topic, findings, conflicts, draft_ref, review, revision]
+    writes: [report_ref]
+    interrupt_before: true          # 发布前暂停等人工批准
+
+flow:
+  entry: planner
+  edges:
+    - {from: planner,    to: researcher}
+    - {from: researcher, to: dedupe, join: all}    # 等所有 researcher 实例跑完
+    - {from: dedupe,     to: writer}
+    - {from: writer,     to: reviewer}
+    - {from: reviewer,   to: writer, if: "review.score < 0.8 and revision < 3"}
+    - {from: reviewer,   to: publish}
+    - {from: publish,    to: END}
