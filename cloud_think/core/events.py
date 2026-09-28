@@ -52,7 +52,10 @@ class ConsoleSink:
         loc = f"step {event.step}" if event.step >= 0 else ""
         if event.node:
             loc = f"{loc} {event.node}".strip()
-        brief = {k: v for k, v in event.payload.items() if k not in ("state", "delta", "messages")}
+        # trace/preview 这类大字段只留在事件表里（ct trace --all 能查），
+        # 终端上刷一页堆栈对人没有帮助。
+        bulky = ("state", "delta", "messages", "trace", "preview")
+        brief = {k: v for k, v in event.payload.items() if k not in bulky}
         text = json.dumps(brief, ensure_ascii=False, default=str) if brief else ""
         if len(text) > 300:
             text = text[:300] + "…"

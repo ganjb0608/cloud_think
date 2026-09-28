@@ -1,0 +1,35 @@
+task_channel: release
+
+state:
+  release:    {type: str,  description: 版本号或发布标题}
+  commits:    {type: list, description: 待整理的提交信息，由 --input 传入}
+  classified: {type: dict, reducer: merge, description: 每条提交的分类结果}
+  buckets:    {type: dict, description: 按类别聚合后的结果}
+  notes_ref:  {type: str,  description: 发布说明 artifact 引用}
+
+agents:
+  classifier:
+    prompt: prompts/classifier.md
+    parallel_over: commits        # 每条提交一个独立实例，并行判断
+    key_by: arg                   # 用提交原文做归并 key
+    output: {classified: json}
+    max_tokens_out: 200
+
+  writer:
+    prompt: prompts/writer.md
+    state_slice: [release, buckets]
+    output: {notes_ref: artifact}
+    artifact_name: "RELEASE_NOTES.md"
+
+scripts:
+  group:
+    run: scripts/group.py
+    reads: [classified]
+    writes: [buckets]
+
+flow:
+  entry: classifier
+  edges:
+    - {from: classifier, to: group, join: all}
+    - {from: group,      to: writer}
+    - {from: writer,     to: END}

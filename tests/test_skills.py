@@ -16,6 +16,7 @@ from cloud_think.skills.lint import lint_all, lint_skill
 from cloud_think.skills.loader import load_skill, parse_frontmatter
 from cloud_think.skills.registry import SkillRegistry
 from cloud_think.skills.router import SkillRouter
+from tests.conftest import SKILLS_DIR
 
 
 def make_skill(tmp_path, name="demo", front="", body="正文" * 60, extra=None):
@@ -201,3 +202,25 @@ class TestRegistry:
         assert reg.names() == ["one"]
         make_skill(tmp_path, "two")
         assert reg.reload().names() == ["one", "two"]
+
+
+class TestCliErrors:
+    """新手遇到的第一个错误不该是一页 traceback。"""
+
+    def test_missing_llm_backend_gives_actionable_hint(self, capsys, tmp_path):
+        from cloud_think.cli import main
+        code = main(["--skills", str(SKILLS_DIR), "--db", str(tmp_path / "e.db"),
+                     "--runs", str(tmp_path / "r"), "--llm", "ollama",
+                     "run", "调研一下本地推理框架"])
+        err = capsys.readouterr().err
+        assert code == 1
+        assert "LLM 后端" in err and "ollama serve" in err
+        assert "run_demo.py" in err, "要给出零配置的替代路径"
+        assert "Traceback" not in err
+
+    def test_no_matching_skill_gives_actionable_hint(self, capsys, tmp_path):
+        from cloud_think.cli import main
+        code = main(["--skills", str(tmp_path / "empty"), "--db", str(tmp_path / "e.db"),
+                     "--llm", "ollama", "run", "随便什么"])
+        assert code == 1
+        assert "--skill" in capsys.readouterr().err

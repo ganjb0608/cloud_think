@@ -221,3 +221,24 @@ class TestFork:
         assert f.state["trace"] == ["a:原始", "b:分叉"]
         assert f.run_id != r.run_id
         assert (await store.load_latest(r.run_id)).state["seed"] == "原始", "原 run 不受影响"
+
+
+class TestConcurrentAccess:
+    """跨进程/跨 agent 共用同一个库是预期用法，不能一撞锁就报错。"""
+
+    async def test_busy_timeout_is_set(self, tmp_path):
+        cp = SQLiteCheckpointer(tmp_path / "c.db")
+        (timeout,) = cp._conn.execute("PRAGMA busy_timeout").fetchone()
+        assert timeout >= 5000
+
+    async def test_two_connections_same_db(self, tmp_path):
+        """第二个进程（这里用第二个连接模拟）能读到第一个写入的 checkpoint。"""
+        a = SQLiteCheckpointer(tmp_path / "shared.db")
+        rid = new_run_id()
+        await a.create_run(rid, "wf", {"skill": "s"})
+        await a.save(Checkpoint(run_id=rid, step=1, state={"x": 1},
+                                frontier=[TaskRef("n")]))
+        b = SQLiteCheckpointer(tmp_path / "shared.db")
+        got = await b.load_latest(rid)
+        assert got is not None and got.state == {"x": 1}
+        assert (await b.get_run(rid))["workflow"] == "wf"

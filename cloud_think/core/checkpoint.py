@@ -102,6 +102,9 @@ _SCHEMA = """
 PRAGMA journal_mode=WAL;
 PRAGMA synchronous=NORMAL;
 PRAGMA foreign_keys=ON;
+-- 多个进程共用同一个库是预期用法（比如两个 agent 都 shell out 到 ct），
+-- 写锁冲突时等待而不是立刻报 "database is locked"。
+PRAGMA busy_timeout=5000;
 
 CREATE TABLE IF NOT EXISTS runs (
   run_id TEXT PRIMARY KEY, workflow TEXT NOT NULL, status TEXT NOT NULL,

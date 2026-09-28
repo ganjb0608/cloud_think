@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from .core.checkpoint import SQLiteCheckpointer
+from .core.errors import CloudThinkError, NodeFailed, RoutingError, SkillError
 from .core.events import EventBus
 from .runtime import Runtime, RuntimeConfig
 from .skills.compiler import compile_skill
@@ -283,6 +284,41 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         print("\n已中断（checkpoint 已保存，可用 ct resume 继续）", file=sys.stderr)
         return 130
+    except (CloudThinkError, KeyError) as e:
+        _explain(e, args)
+        return 1
+
+
+def _explain(exc: BaseException, args: argparse.Namespace) -> None:
+    """把异常翻译成可操作的提示。
+
+    新手遇到的第一个错误几乎总是"没配 LLM 后端"，给他一页 traceback 帮不上忙。
+    """
+    detail = str(exc)
+    print(f"\n\033[31m失败:\033[0m {detail}", file=sys.stderr)
+
+    hint = ""
+    if isinstance(exc, NodeFailed) and ("连接失败" in detail or "Connection refused" in detail):
+        kind = (getattr(args, "llm", None) or os.environ.get("CT_LLM", "ollama"))
+        hint = (f"看起来 LLM 后端（--llm {kind}）连不上。检查：\n"
+                f"  • ollama:    ollama serve  然后  ollama pull qwen2.5:7b\n"
+                f"  • anthropic: export CT_LLM=anthropic ANTHROPIC_API_KEY=...\n"
+                f"  • 兼容端点:   export CT_LLM=openai OPENAI_BASE_URL=http://...\n"
+                f"  • 只想先看看流程：python examples/run_demo.py（不需要任何后端）")
+    elif isinstance(exc, NodeFailed):
+        hint = ("节点重试耗尽。checkpoint 已保存，修好之后可以接着跑：\n"
+                f"  ct --db {getattr(args, 'db', 'state.db')} runs        # 找到 run_id\n"
+                f"  ct --db {getattr(args, 'db', 'state.db')} trace <run_id>   # 看失败在哪\n"
+                f"  ct --db {getattr(args, 'db', 'state.db')} resume <run_id>  # 从断点继续")
+    elif isinstance(exc, RoutingError):
+        hint = ("没有 skill 匹配这个任务。可以：\n"
+                "  • 用 --skill <name> 跳过路由直接指定\n"
+                "  • ct lint 检查 description 有没有写清楚触发条件\n"
+                "  • ct skills 看一眼装了哪些 skill")
+    elif isinstance(exc, SkillError):
+        hint = "skill 包有问题，跑 ct lint 看完整校验结果。"
+    if hint:
+        print(f"\n{hint}", file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -15,13 +15,19 @@
 产出
 ```
 
+> **新手从这里开始**：[docs/TUTORIAL.md](docs/TUTORIAL.md) —— 原理、实现、动手操作、
+> 与普通 skill 的对比，以及跨 Claude Code / Codex / Qoder 等 agent 使用的完整说明。
+>
+> 要接到别的 agent 里：[docs/integrations/](docs/integrations/)（有可直接复制的模板）
+
 ## 快速开始
 
 ```bash
 pip install -e ".[dev]"
 
-python examples/run_demo.py        # 不需要 ollama、不需要 API key，端到端跑一遍
-pytest -q                          # 98 项测试，全程离线
+python examples/run_demo.py        # 端到端跑一遍复杂任务（不需要 ollama / API key）
+python examples/run_tutorial.py    # 教程配套的最小例子
+pytest -q                          # 107 项测试，全程离线
 ```
 
 `run_demo.py` 用脚本化 LLM 完整走一遍调研报告任务：路由 → 拆解 → 4 路并行调研 →
@@ -120,7 +126,7 @@ skill 可能来自外部分享，不当可信代码跑。
 
 ## 测试
 
-98 项，全程离线（脚本化 LLM + 本地 BM25 语料），覆盖：
+107 项，全程离线（脚本化 LLM + 本地 BM25 语料），覆盖：
 
 - reducer 合并语义与并发写冲突检测
 - 表达式求值器的沙箱边界（`__import__`、推导式、lambda 一律拒绝）
